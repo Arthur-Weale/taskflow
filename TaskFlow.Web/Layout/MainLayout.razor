@@ -1,16 +1,39 @@
 ﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+<div class="app-layout">
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <div class="sidebar-logo-icon">
+                <i class="ti ti-check" aria-hidden="true"></i>
+            </div>
+            <span>TaskFlow</span>
         </div>
 
-        <article class="content px-4">
-            @Body
-        </article>
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-item active">
+                <i class="ti ti-layout-dashboard" aria-hidden="true"></i>
+                Dashboard
+            </a>
+            <a href="/" class="nav-item">
+                <i class="ti ti-circle-check" aria-hidden="true"></i>
+                Completed
+            </a>
+            <a href="/" class="nav-item">
+                <i class="ti ti-settings" aria-hidden="true"></i>
+                Settings
+            </a>
+        </nav>
+
+        <div class="sidebar-user">
+            <div class="user-avatar">AR</div>
+            <div class="user-info">
+                <p>Arthur</p>
+                <span>Free plan</span>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        @Body
     </main>
 </div>
