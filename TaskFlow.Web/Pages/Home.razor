@@ -1,7 +1,217 @@
 ﻿@page "/"
+@inject TaskFlow.Web.Services.TaskService TaskService
 
-<PageTitle>Home</PageTitle>
+<div class="page-header">
+    <div>
+        <h1>My tasks</h1>
+        <p>@DateTime.Now.ToString("dddd, dd MMMM yyyy")</p>
+    </div>
+    <button class="btn-primary" @onclick="() => showAddPanel = !showAddPanel">
+        <i class="ti ti-plus" aria-hidden="true"></i>
+        New task
+    </button>
+</div>
 
-<h1>Hello, world!</h1>
+<div class="stats-row">
+    <div class="stat-card">
+        <p>Total tasks</p>
+        <span class="stat-total">@(tasks?.Count ?? 0)</span>
+    </div>
+    <div class="stat-card">
+        <p>Completed</p>
+        <span class="stat-completed">@(tasks?.Count(t => t.IsCompleted) ?? 0)</span>
+    </div>
+    <div class="stat-card">
+        <p>Pending</p>
+        <span class="stat-pending">@(tasks?.Count(t => !t.IsCompleted) ?? 0)</span>
+    </div>
+</div>
 
-Welcome to your new app.
+@if (showAddPanel)
+{
+    <div class="add-panel">
+        <h2>Add new task</h2>
+        <div class="form-row">
+            <input @bind="newTask.Title" placeholder="Task title" />
+            <input @bind="newTask.Description" placeholder="Description" />
+            <input type="date" @bind="newTask.DueDate" />
+            <select @bind="newTask.Priority">
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+            </select>
+            <button class="btn-primary" @onclick="CreateTask">
+                <i class="ti ti-plus" aria-hidden="true"></i>
+                Add task
+            </button>
+        </div>
+    </div>
+}
+
+<div class="toolbar">
+    <div class="search-wrapper">
+        <i class="ti ti-search" aria-hidden="true"></i>
+        <input @bind="searchTerm" @bind:event="oninput" placeholder="Search tasks..." />
+    </div>
+    <select @bind="filterStatus">
+        <option value="All">All</option>
+        <option value="Pending">Pending</option>
+        <option value="Completed">Completed</option>
+    </select>
+</div>
+
+@if (tasks == null)
+{
+    <div class="empty-state">
+        <i class="ti ti-loader" aria-hidden="true"></i>
+        Loading tasks...
+    </div>
+}
+else if (!FilteredTasks.Any())
+{
+    <div class="empty-state">
+        <i class="ti ti-clipboard-off" aria-hidden="true"></i>
+        No tasks found.
+    </div>
+}
+else
+{
+    <div class="task-list">
+        @foreach (var task in FilteredTasks)
+        {
+            <div class="task-row">
+                @if (editingTaskId == task.Id)
+                {
+                    <div class="task-toggle completed">
+                        <i class="ti ti-check" aria-hidden="true"></i>
+                    </div>
+                    <input class="edit-input" style="flex:2" @bind="editingTask!.Title" />
+                    <select class="edit-input" style="flex:1" @bind="editingTask!.Priority">
+                        <option value="Low">Low</option>
+                        <option value="Medium">Medium</option>
+                        <option value="High">High</option>
+                    </select>
+                    <input class="edit-input" type="date" style="flex:1" @bind="editingTask!.DueDate" />
+                    <div class="task-actions" style="opacity:1">
+                        <button class="icon-btn" @onclick="SaveEdit" title="Save">
+                            <i class="ti ti-device-floppy" aria-hidden="true"></i>
+                        </button>
+                        <button class="icon-btn danger" @onclick="CancelEdit" title="Cancel">
+                            <i class="ti ti-x" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                }
+                else
+                {
+                    <div class="task-toggle @(task.IsCompleted ? "completed" : "")"
+                         @onclick="() => ToggleComplete(task.Id)">
+                        @if (task.IsCompleted)
+                        {
+                            <i class="ti ti-check" aria-hidden="true"></i>
+                        }
+                    </div>
+                    <span class="task-title @(task.IsCompleted ? "completed" : "")">
+                        @task.Title
+                    </span>
+                    <span class="badge badge-@task.Priority.ToLower()">@task.Priority</span>
+                    <span class="task-date @(IsOverdue(task) ? "overdue" : "")">
+                        @(IsOverdue(task) ? "Overdue" : task.DueDate?.ToString("dd MMM"))
+                    </span>
+                    <div class="task-actions">
+                        <button class="icon-btn" @onclick="() => StartEdit(task)" title="Edit">
+                            <i class="ti ti-edit" aria-hidden="true"></i>
+                        </button>
+                        <button class="icon-btn danger" @onclick="() => DeleteTask(task.Id)" title="Delete">
+                            <i class="ti ti-trash" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<TaskFlow.Web.Models.TaskItem>? tasks;
+    private TaskFlow.Web.Models.TaskItem newTask = new();
+    private int? editingTaskId = null;
+    private TaskFlow.Web.Models.TaskItem? editingTask = null;
+    private string searchTerm = string.Empty;
+    private string filterStatus = "All";
+    private bool showAddPanel = false;
+
+    private IEnumerable<TaskFlow.Web.Models.TaskItem> FilteredTasks =>
+        tasks?
+            .Where(t => string.IsNullOrWhiteSpace(searchTerm) ||
+                        t.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase))
+            .Where(t => filterStatus == "All" ||
+                        (filterStatus == "Completed" && t.IsCompleted) ||
+                        (filterStatus == "Pending" && !t.IsCompleted))
+        ?? Enumerable.Empty<TaskFlow.Web.Models.TaskItem>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        tasks = await TaskService.GetAllAsync();
+    }
+
+    private bool IsOverdue(TaskFlow.Web.Models.TaskItem task)
+    {
+        return task.DueDate.HasValue &&
+               task.DueDate.Value.Date < DateTime.Today &&
+               !task.IsCompleted;
+    }
+
+    private async Task CreateTask()
+    {
+        if (!string.IsNullOrWhiteSpace(newTask.Title))
+        {
+            await TaskService.CreateAsync(newTask);
+            newTask = new();
+            showAddPanel = false;
+            tasks = await TaskService.GetAllAsync();
+        }
+    }
+
+    private void StartEdit(TaskFlow.Web.Models.TaskItem task)
+    {
+        editingTaskId = task.Id;
+        editingTask = new TaskFlow.Web.Models.TaskItem
+        {
+            Id          = task.Id,
+            Title       = task.Title,
+            Description = task.Description,
+            DueDate     = task.DueDate,
+            Priority    = task.Priority,
+            IsCompleted = task.IsCompleted
+        };
+    }
+
+    private async Task SaveEdit()
+    {
+        if (editingTask != null && !string.IsNullOrWhiteSpace(editingTask.Title))
+        {
+            await TaskService.UpdateAsync(editingTask.Id, editingTask);
+            editingTaskId = null;
+            editingTask = null;
+            tasks = await TaskService.GetAllAsync();
+        }
+    }
+
+    private void CancelEdit()
+    {
+        editingTaskId = null;
+        editingTask = null;
+    }
+
+    private async Task ToggleComplete(int id)
+    {
+        await TaskService.ToggleCompleteAsync(id);
+        tasks = await TaskService.GetAllAsync();
+    }
+
+    private async Task DeleteTask(int id)
+    {
+        await TaskService.DeleteAsync(id);
+        tasks = await TaskService.GetAllAsync();
+    }
+}
