@@ -53,7 +53,7 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("BlazorClient", policy =>
-        policy.WithOrigins("http://localhost:5181", "https://localhost:7181")
+        policy.WithOrigins("http://localhost:5181", "https://localhost:7181", "https://taskflow-production-6d41.up.railway.app")
               .AllowAnyHeader()
               .AllowAnyMethod());
 });
