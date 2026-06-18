@@ -59,7 +59,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
             "http://localhost:5181",
             "https://localhost:7181",
-            "https://taskflow-production-6d41.up.railway.app")
+            "https://taskflow-production-6d41.up.railway.app",
+            "https://taskflowit.netlify.app")
               .AllowAnyHeader()
               .AllowAnyMethod());
 });
