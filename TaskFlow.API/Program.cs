@@ -13,9 +13,12 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(
             new System.Text.Json.Serialization.JsonStringEnumConverter()));
 
-// Database
+// Database - reads from environment variable or falls back to local
+var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? "Data Source=taskflow.db";
+
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite("Data Source=taskflow.db"));
+    options.UseSqlite(connectionString));
 
 // Identity
 builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
@@ -53,13 +56,15 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("BlazorClient", policy =>
-        policy.WithOrigins("http://localhost:5181", "https://localhost:7181", "https://taskflow-production-6d41.up.railway.app")
+        policy.WithOrigins(
+            "http://localhost:5181",
+            "https://localhost:7181",
+            "https://taskflow-production-6d41.up.railway.app")
               .AllowAnyHeader()
               .AllowAnyMethod());
 });
 
 // Swagger
-builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -90,6 +95,13 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+
+// Auto-run migrations on startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
 
 app.UseSwagger();
 app.UseSwaggerUI();
